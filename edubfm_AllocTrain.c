@@ -103,9 +103,37 @@ Four edubfm_AllocTrain(
 
 	/* Error check whether using not supported functionality by EduBfM */
 	if(sm_cfgParams.useBulkFlush) ERR(eNOTSUPPORTED_EDUBFM);
-
-
-    
-    return( victim );
-    
+	victim = BI_NEXTVICTIM(type);
+	for(i=0; i< (NUM_BUF_TYPES *BI_NBUFS(type));i++, victim = (victim + 1) % BI_NBUFS(type))
+	{
+		if(BI_FIXED(type,victim)<=0)
+		{
+			if (BI_BITS(type, victim) & REFER)//REFER버퍼가 set되어있는지 확인
+			{
+				BI_BITS(type, victim) ^= REFER;//REFER버퍼 clear
+			}
+		
+			else//victim선정완료 
+			{
+				if(BI_BITS(type,victim) & DIRTY)//페이지 수정이 있음 dirty가 셋됨
+				{
+					e = edubfm_FlushTrain((TrainID*)&BI_KEY(type, victim), type);//flush
+					if (e < 0)ERR(e);
+				}
+				if(!IS_NILBFMHASHKEY(BI_KEY(type,victim)))
+				{
+					e = edubfm_Delete(&BI_KEY(type, victim), type);
+					if (e < 0)ERR(e);
+				}
+				BI_BITS(type, victim) = ALL_0;
+				BI_NEXTVICTIM(type) = (victim + 1) % BI_NBUFS(type);
+				break;
+			}
+		}
+	}
+	if (i == NUM_BUF_TYPES * BI_NBUFS(type))
+	{
+		ERR(eNOUNFIXEDBUF_BFM);
+	}
+	return(victim);
 }  /* edubfm_AllocTrain */

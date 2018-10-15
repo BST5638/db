@@ -96,7 +96,7 @@ Four EduBfM_GetTrain(
     char                **retBuf,               /* OUT pointer to the returned buffer */
     Four                type )                  /* IN buffer type */
 {
-	/* These local variables are used in the solution code. However, you don��t have to use all these variables in your code, and you may also declare and use additional local variables if needed. */
+	/* These local variables are used in the solution code. However, you don��t have to use all these variables in your code, and you may also declare and use additional local variables if needed. */
     Four                e;                      /* for error */
     Four                index;                  /* index of the buffer pool */
 
@@ -107,13 +107,28 @@ Four EduBfM_GetTrain(
 
     /* Is the buffer type valid? */
     if(IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);	
-    if(edubfm_LookUp(BFM_HASH(trainId,type),type)=NOTFOUND_IN_HTABLE)//if trainid doesn't exist
+    if(edubfm_LookUp(trainId,type)==-1)//if trainid doesn't exist
     {
-	    edubfm_Insert(trainId, index,type);
+		index = bfm_AllocTrain(type);//������ ��ġ �Ҵ�޾ƿ���
+		edubfm_ReadTrain(trainId,BI_BUFFER(type,index), type);//page/train�� ��ũ�κ��� �о�ͼ� �Ҵ� ���� buffer element�� ������
+		BI_KEY(type, index).pageNo = trainId->pageNo;
+		BI_KEY(type, index).volNo = trainId->volNo;
+		BI_FIXED(type,index) = 1;//fixed ����
+		BI_BITS(type,index)= REFER;//bit����
+		e=edubfm_Insert(trainId, index, type);//hashtable insert
+		if (e < 0) ERR(e);
     }
-    else{
-
-	   }
+    else if(edubfm_LookUp(trainId, type) >=0)
+	{
+		index = edubfm_LookUp(trainId, type);
+		BI_FIXED(type,index) += 1;
+		BI_BITS(type, index) = REFER;
+	}	
+	else 
+	{
+		ERR(edubfm_LookUp(trainId, type));
+	}
+	*retBuf=BI_BUFFER(type, index);
 
 
     return(eNOERROR);   /* No error */

@@ -67,6 +67,7 @@
 #include <stdlib.h> /* for malloc & free */
 #include "EduBfM_common.h"
 #include "EduBfM_Internal.h"
+#include "EduBfM_basictypes.h"
 
 
 
@@ -113,15 +114,14 @@ Four edubfm_Insert(
     if( (index < 0) || (index > BI_NBUFS(type)) )
         ERR( eBADBUFINDEX_BFM );
     hashValue=BFM_HASH(key,type);//asgin hashvalue
-    if(bufInfo[type].hash
-		    Table[hashValue]==NIL)//
+    if(bufInfo[type].hashTable[hashValue]==NIL)//
     {
-	bufInfo[type].hashtable[hashValue]=index;//buffertable insert
+		bufInfo[type].hashTable[hashValue]=index;//buffertable insert
     }
     else
     {
-    	(bufInfo[type].bufTable[index].nextHashEntry=bufInfo[type].hashtable[hashValue];	 
-	bufInfo[type].hashTable[hashValue]=index;//buffertable insert
+    	bufInfo[type].bufTable[index].nextHashEntry=bufInfo[type].hashTable[hashValue];	 
+		bufInfo[type].hashTable[hashValue]=index;//buffertable insert
 	}
     return( eNOERROR );
 
@@ -157,10 +157,36 @@ Four edubfm_Delete(
 
     CHECKKEY(key);    /*@ check validity of key */
     hashValue=BFM_HASH(key,type);//assign hashvalue
-    i = (short)edubfm_LookUp(key);
-    if(i!=-1)
+    i = (short)edubfm_LookUp(key,type);
+    if(i!=NIL)
     {
-	bufInfo[type].bufTable[i]=NIL;	    
+		if (bufInfo[type].hashTable[hashValue] = i)//linked list제일 앞일 경우 
+		{
+			if (bufInfo[type].bufTable[i].nextHashEntry == NULL)//linked list 사이즈가 1
+			{
+				bufInfo[type].hashTable[hashValue] = NIL;//해쉬 테이블의 hashValue위치 값 NIL설정
+			}
+			else//아닐 경우
+			{
+				bufInfo[type].hashTable[hashValue] = bufInfo[type].bufTable[i].nextHashEntry;// hashTable[hashValue]에 i의 다음 링크드 리스트 값넣기
+			}
+		}
+		else
+		{
+			prev = bufInfo[type].hashTable[hashValue];
+			while (bufInfo[type].bufTable[prev].nextHashEntry = i) 
+			{
+				prev = bufInfo[type].bufTable[prev].nextHashEntry;
+			}
+			if (bufInfo[type].bufTable[i].nextHashEntry == NULL)
+			{
+				bufInfo[type].bufTable[prev].nextHashEntry = NIL;
+			}
+			else
+			{
+				bufInfo[type].bufTable[prev].nextHashEntry = bufInfo[type].bufTable[i].nextHashEntry;
+			}
+		}
     }
     else{ERR( eNOTFOUND_BFM );}
 
@@ -196,17 +222,17 @@ Four edubfm_LookUp(
 
     CHECKKEY(key);    /*@ check validity of key */
     hashValue=BFM_HASH(key,type);
-    i=bufInfo[type].hashhTable[hashValue];
-    if(EQUALKEY(bufInfo[type].bufTable[i].key,key); return ((int)i);
-    j=bufInfo[type].bufTable[i].nextHashentry;
-    while(bufInfo[type].bufTable[i]!=NIL)
+    i=bufInfo[type].hashTable[hashValue];
+	if (EQUALKEY(&bufInfo[type].bufTable[i].key, key)) return ((int)i);
+	j = bufInfo[type].bufTable[i].nextHashEntry;
+	while(j!=NIL)
     {
-	if(EQUALKEY(bufInfo[type].bufTable[j].key,key)==1)
-	{
-		return((int)j);	
-	}	
+		if(EQUALKEY(&bufInfo[type].bufTable[j].key,key)==1)
+		{
+			return((int)j);	
+		}
+		j = bufInfo[type].bufTable[j].nextHashEntry;
     }
-
     return(NOTFOUND_IN_HTABLE);
     
 }  /* edubfm_LookUp */
@@ -232,12 +258,15 @@ Four edubfm_DeleteAll(void)
 {
 	/* These local variables are used in the solution code. However, you don’t have to use all these variables in your code, and you may also declare and use additional local variables if needed. */
     Two 	i;
-    Four        tableSize;
-
-    for(i=0;i<tableSize;i++){
-    
-    }
-
+	Four        tableSize;
+	tableSize = HASHTABLESIZE(PAGE_BUF);
+	for (i = 0; i < tableSize; i++) {
+		BI_HASHTABLEENTRY(PAGE_BUF, i) = NIL;
+	}
+	tableSize = HASHTABLESIZE(LOT_LEAF_BUF);
+	for (i = 0; i < tableSize; i++) {
+		BI_HASHTABLEENTRY(LOT_LEAF_BUF, i) = NIL;
+	}
 
     return(eNOERROR);
 

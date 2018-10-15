@@ -47,13 +47,13 @@
 /*                                                                            */
 /******************************************************************************/
 /*
- * Module: EduBfM_FlushAll.c
+ * Module: EduBfM_GetTrain.c
  *
- * Description :
- *  Flush dirty buffers holding trains.
+ * Description : 
+ *  Return a buffer which has the disk content indicated by `trainId'.
  *
  * Exports:
- *  Four EduBfM_FlushAll(void)
+ *  Four EduBfM_GetTrain(TrainID *, char **, Four)
  */
 
 
@@ -63,38 +63,70 @@
 
 
 /*@================================
- * EduBfM_FlushAll()
+ * EduBfM_GetTrain()
  *================================*/
 /*
- * Function: Four EduBfM_FlushAll(void)
+ * Function: EduBfM_GetTrain(TrainID*, char**, Four)
  *
- * Description :
+ * Description : 
  * (Following description is for original ODYSSEUS/COSMOS BfM.
  *  For ODYSSEUS/EduCOSMOS EduBfM, refer to the EduBfM project manual.)
  *
- *  Flush dirty buffers holding trains.
- *  A dirty buffer is one with the dirty bit set.
+ *  Return a buffer which has the disk content indicated by `trainId'.
+ *  Before the allocation of a buffer, look up the train in the buffer
+ *  pool using hashing mechanism.   If the train already  exist in the pool
+ *  then simply return it and set the reference bit of the correponding
+ *  buffer table entry.   Otherwise, i.e. the train does not exist in the
+ *  pool, allocate a buffer (a buffer selected as victim may be forced out
+ *  by the buffer replacement algorithm), read a disk train into the 
+ *  selected buffer train, and return it.
  *
  * Returns:
  *  error code
+ *    eBADBUFFER_BFM - Invalid Buffer
+ *    eBADBUFFERTYPE_BFM - Invalid Buffer type
+ *    some errors caused by function calls
+ *
+ * Side effects:
+ *  1) parameter retBuf
+ *     pointer to buffer holding the disk train indicated by `trainId'
  */
-Four EduBfM_FlushAll(void)
+Four EduBfM_GetTrain(
+    TrainID             *trainId,               /* IN train to be used */
+    char                **retBuf,               /* OUT pointer to the returned buffer */
+    Four                type )                  /* IN buffer type */
 {
 	/* These local variables are used in the solution code. However, you don’t have to use all these variables in your code, and you may also declare and use additional local variables if needed. */
-    Four        e;                      /* error */
-    Two         i;                      /* index */
-    Four        type;                   /* buffer type */
-	for (type = 0; type < NUM_BUF_TYPES; type++) {
-		for (i = 0; i < BI_NBUFS(type); i++)
-		{
-			if (!IS_NILBFMHASHKEY(BI_KEY(type, i)) && BI_BITS(type, i) & DIRTY) {
-				e = edubfm_FlushTrain((TrainID*)&BI_KEY(type, i), type);
-				if (e < 0) ERR(e);
-			}
-		}
-	}
+    Four                e;                      /* for error */
+    Four                index;                  /* index of the buffer pool */
 
-    return( eNOERROR );
-    
-}  /* EduBfM_FlushAll() */
 
+    /*@ Check the validity of given parameters */
+    /* Some restrictions may be added         */
+    if(retBuf == NULL) ERR(eBADBUFFER_BFM);
+
+    /* Is the buffer type valid? */
+    if(IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);	
+    if(bfm_LookUp(trainId,type)==-1)//if trainid doesn't exist
+    {
+		index = bfm_AllocTrain(type);//저장할 위치 할당받아오기
+		bfm_ReadTrain(trainId,BI_BUFFER(type,index), type);//page/train을 디스크로부터 읽어와서 할당 받은 buffer element에 저장함
+		BI_KEY(type, index).pageNo = trainId->pageNo;
+		BI_KEY(type, index).volNo = trainId->volNo;
+		BI_FIXED(type,index) = 1;//fixed 설정
+		BI_BITS(type,index)= REFER;//bit설정(수정필요!!), nextHashEntry는 필요없음
+		//bfm_Insert(BI_BUFFER(type,index), index, type);
+		//return(retBuf);
+    }
+    /*else
+	{
+		index = bfm_LookUp(trainId, retBuf, type);
+		BI_FIXED(type,index) += 1;
+		BI_BITS(type,index) &= ~(1 << REFER);
+		return(retBuf);
+	}*/
+
+
+    return(eNOERROR);   /* No error */
+
+}  /* EduBfM_GetTrain() */

@@ -84,7 +84,7 @@
  *  error code
  *    some errors caused by function calls
  */
-Four edubfm_FlushTrain(
+Four edubfm_FlushTrain(//need to be add
     TrainID 			*trainId,		/* IN train to be flushed */
     Four   			type)			/* IN buffer type */
 {
@@ -95,9 +95,14 @@ Four edubfm_FlushTrain(
 
 	/* Error check whether using not supported functionality by EduBfM */
 	if (RM_IS_ROLLBACK_REQUIRED()) ERR(eNOTSUPPORTED_EDUBFM);
-
-
-	
+	index=edubfm_LookUp(trainId, type);
+	if (index == NIL) ERR(eNOTFOUND_BFM);//if not found
+	if (BI_BITS(type,index) & DIRTY)
+	{
+		e = RDsM_WriteTrain(BI_BUFFER(type, index), trainId, BI_BUFSIZE(type));
+		if (e < 0) ERR(e);
+		BI_BITS(type, index) ^= DIRTY;
+	}
     return( eNOERROR );
 
 }  /* edubfm_FlushTrain */

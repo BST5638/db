@@ -47,13 +47,13 @@
 /*                                                                            */
 /******************************************************************************/
 /*
- * Module: EduBfM_FlushAll.c
+ * Module: EduBfM_FreeTrain.c
  *
  * Description :
- *  Flush dirty buffers holding trains.
+ *  Free(or unfix) a buffer.
  *
  * Exports:
- *  Four EduBfM_FlushAll(void)
+ *  Four EduBfM_FreeTrain(TrainID *, Four)
  */
 
 
@@ -63,38 +63,42 @@
 
 
 /*@================================
- * EduBfM_FlushAll()
+ * EduBfM_FreeTrain()
  *================================*/
 /*
- * Function: Four EduBfM_FlushAll(void)
+ * Function: Four EduBfM_FreeTrain(TrainID*, Four)
  *
  * Description :
  * (Following description is for original ODYSSEUS/COSMOS BfM.
  *  For ODYSSEUS/EduCOSMOS EduBfM, refer to the EduBfM project manual.)
  *
- *  Flush dirty buffers holding trains.
- *  A dirty buffer is one with the dirty bit set.
+ *  Free(or unfix) a buffer.
+ *  This function simply frees a buffer by decrementing the fix count by 1.
  *
- * Returns:
+ * Returns :
  *  error code
+ *    eBADBUFFERTYPE_BFM - bad buffer type
+ *    some errors caused by fuction calls
  */
-Four EduBfM_FlushAll(void)
+Four EduBfM_FreeTrain( 
+    TrainID             *trainId,       /* IN train to be freed */
+    Four                type)           /* IN buffer type */
 {
 	/* These local variables are used in the solution code. However, you don¡¯t have to use all these variables in your code, and you may also declare and use additional local variables if needed. */
-    Four        e;                      /* error */
-    Two         i;                      /* index */
-    Four        type;                   /* buffer type */
-	for (type = 0; type < NUM_BUF_TYPES; type++) {
-		for (i = 0; i < BI_NBUFS(type); i++)
-		{
-			if (!IS_NILBFMHASHKEY(BI_KEY(type, i)) && BI_BITS(type, i) & DIRTY) {
-				e = edubfm_FlushTrain((TrainID*)&BI_KEY(type, i), type);
-				if (e < 0) ERR(e);
-			}
-		}
-	}
+    Four                index;          /* index on buffer holding the train */
+    Four 		e;		/* error code */
 
+    /*@ check if the parameter is valid. */
+    if (IS_BAD_BUFFERTYPE(type)) ERR(eBADBUFFERTYPE_BFM);	
+	index=edubfm_LookUp(trainId,type);
+	if (index == NIL) { return(eNOTFOUND_BFM); }
+	BI_FIXED(type,index) += (-1);
+	if (BI_FIXED(type,index) < 0) 
+	{
+		printf("fixed counter is less than 0!!");//need to be changed
+		BI_FIXED(type, index) = 0;
+	}
+    
     return( eNOERROR );
     
-}  /* EduBfM_FlushAll() */
-
+} /* EduBfM_FreeTrain() */
